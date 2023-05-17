@@ -9,12 +9,33 @@
     - mongodb_disable_transparent_hugepages | bool
     - ansible_service_mgr == "systemd"
 
-- name: Add APT key
+# - name: Add APT key
+#   apt_key:
+#     keyserver: "{{ mongodb_apt_keyserver if not mongodb_apt_key_from_url|bool else omit }}"
+#     url: "{{ mongodb_apt_key_url[mongodb_major_version] if mongodb_apt_key_from_url|bool else omit }}"
+#     id: "{{ mongodb_apt_key_id[mongodb_major_version] }}"
+#   when: mongodb_package == 'mongodb-org'
+
+- name: apt keys from keyserver
   apt_key:
-    keyserver: "{{ mongodb_apt_keyserver if not mongodb_apt_key_from_url|bool else omit }}"
-    url: "{{ mongodb_apt_key_url[mongodb_major_version] if mongodb_apt_key_from_url|bool else omit }}"
     id: "{{ mongodb_apt_key_id[mongodb_major_version] }}"
+    keyserver: "{{ mongodb_apt_keyserver if not mongodb_apt_key_from_url|bool else omit }}"
+    state: present
+    keyring: /etc/apt/trusted.gpg.d/{{ mongodb_apt_key_id[mongodb_major_version] }}.gpg
   when: mongodb_package == 'mongodb-org'
+
+
+- name: Add APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [ arch=amd64,arm64 signed-by=/etc/apt/trusted.gpg.d/{{ mongodb_apt_key_id[mongodb_major_version] }}.gpg ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/4.4 multiverse"
+    state: present
+
+- name: Add APT security repository
+  ansible.builtin.apt_repository:
+    repo: "deb http://security.ubuntu.com/ubuntu focal-security main"
+    state: present
+    update_cache: true 
+
 
 - name: Fail when used wrong mongodb_version variable
   fail:
@@ -23,14 +44,14 @@
         (mongodb_version is not defined
          or mongodb_repository[mongodb_major_version] is not defined))
 
-- name: Add APT repository
-  apt_repository:
-    repo: "{{ mongodb_repository[version_item] }}"
-    update_cache: true
-  with_items: "{{ mongodb_major_version }}"
-  loop_control:
-    loop_var: version_item
-  when: mongodb_package == 'mongodb-org'
+# - name: Add APT repository
+#   apt_repository:
+#     repo: "{{ mongodb_repository[version_item] }}"
+#     update_cache: true
+#   with_items: "{{ mongodb_major_version }}"
+#   loop_control:
+#     loop_var: version_item
+#   when: mongodb_package == 'mongodb-org'
 
 - name: Install MongoDB package
   apt:
